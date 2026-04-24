@@ -3,25 +3,29 @@ import smtplib
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timezone
 
 PRODUCT_ID = "11942"
-SKU_ID = "17572"
-API_URL = f"https://www.popmart.com/api/v2/product/productDetails?spuId={PRODUCT_ID}&s={SKU_ID}"
+API_URL = f"https://prod-intl-api.popmart.com/shop/v1/shop/productDetails?spuId={PRODUCT_ID}&s=0b3b75d83e789be6c06c6274a75eba02"
 PRODUCT_PAGE = f"https://www.popmart.com/sg/products/{PRODUCT_ID}/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
 PRODUCT_NAME = 'Angry Molly × Crocs "Angry Cheese" Co-branded Figurine'
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.popmart.com/sg/",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
     "Origin": "https://www.popmart.com",
+    "Referer": "https://www.popmart.com/sg/",
+    "Country": "SG",
+    "Clientkey": "rmdsjsk7gwylcix",
 }
 
 
 def check_stock() -> tuple[bool, str]:
-    resp = requests.get(API_URL, headers=HEADERS, timeout=15)
+    ts = int(datetime.now(timezone.utc).timestamp())
+    url = f"{API_URL}&t={ts}"
+    resp = requests.get(url, headers=HEADERS, timeout=15)
     resp.raise_for_status()
     data = resp.json()
 
@@ -37,7 +41,7 @@ def check_stock() -> tuple[bool, str]:
         if online_stock > 0:
             return True, f"SKU '{sku_title}' 庫存 = {online_stock}"
 
-    return False, f"所有 SKU onlineStock = 0"
+    return False, "所有 SKU onlineStock = 0"
 
 
 def send_email(reason: str):
