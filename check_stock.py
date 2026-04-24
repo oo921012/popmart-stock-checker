@@ -1,48 +1,60 @@
-import subprocess
-import sys
 import smtplib
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timezone
+from curl_cffi import requests
 
-# 確保 chromium 已安裝
-subprocess.run(
-    [sys.executable, "-m", "playwright", "install", "chromium"],
-    check=True
-)
-
-from playwright.sync_api import sync_playwright
-
-PRODUCT_PAGE = "https://www.popmart.com/sg/products/11942/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
+PRODUCT_ID = "11942"
+API_URL = f"https://prod-intl-api.popmart.com/shop/v1/shop/productDetails?spuId={PRODUCT_ID}&s=0b3b75d83e789be6c06c6274a75eba02"
+PRODUCT_PAGE = f"https://www.popmart.com/sg/products/{PRODUCT_ID}/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
 PRODUCT_NAME = 'Angry Molly × Crocs "Angry Cheese" Co-branded Figurine'
+
+HEADERS = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Origin": "https://www.popmart.com",
+    "Referer": "https://www.popmart.com/",
+    "Clientkey": "rmdxjisk7gwykcix",
+    "Country": "SG",
+    "Grey-Secret": "null",
+    "Language": "en",
+    "X-Client-Country": "SG",
+    "X-Client-Namespace": "eurasian",
+    "X-Device-Os-Type": "web",
+    "X-Doughnuts": "",
+    "X-Project-Id": "eude",
+}
 
 
 def check_stock() -> tuple[bool, str]:
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36",
-            locale="en-US",
-        )
-        page = context.new_page()
-        page.goto(PRODUCT_PAGE, wait_until="networkidle", timeout=30000)
-        page.wait_for_selector("button", timeout=15000)
+    ts = int(datetime.now(timezone.utc).timestamp())
+    url = f"{API_URL}&t={ts}"
 
-        buttons = page.locator("button").all_text_contents()
-        print(f"  找到按鈕：{buttons}")
+    resp = requests.get(
+        url,
+        headers=HEADERS,
+        impersonate="chrome",
+        timeout=15
+    )
+    print(f"  HTTP 狀態碼：{resp.status_code}")
+    resp.raise_for_status()
+    data = resp.json()
 
-        for btn in buttons:
-            text = btn.strip().upper()
-            if "ADD TO CART" in text or "BUY NOW" in text:
-                browser.close()
-                return True, f"按鈕文字：'{btn.strip()}'"
-            if "SOLD OUT" in text:
-                browser.close()
-                return False, f"按鈕文字：'{btn.strip()}'"
+    skus = data.get("data", {}).get("skus", [])
+    if not skus:
+        print(f"  API 回傳：{data}")
+        return False, "API 回傳無 SKU 資料"
 
-        browser.close()
-        return False, f"未找到明確按鈕：{buttons}"
+    for sku in skus:
+        stock = sku.get("stock", {})
+        online_stock = stock.get("onlineStock", 0)
+        sku_title = sku.get("title", sku.get("id", "?"))
+        print(f"  SKU [{sku_title}] onlineStock = {online_stock}")
+        if online_stock > 0:
+            return True, f"SKU '{sku_title}' 庫存 = {online_stock}"
+
+    return False, "所有 SKU onlineStock = 0"
 
 
 def send_email(reason: str):
