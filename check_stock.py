@@ -1,58 +1,42 @@
-import requests
 import smtplib
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timezone
+from datetime import datetime
+from playwright.sync_api import sync_playwright
 
-PRODUCT_ID = "11942"
-API_URL = f"https://prod-intl-api.popmart.com/shop/v1/shop/productDetails?spuId={PRODUCT_ID}&s=0b3b75d83e789be6c06c6274a75eba02"
-PRODUCT_PAGE = f"https://www.popmart.com/sg/products/{PRODUCT_ID}/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
+PRODUCT_PAGE = "https://www.popmart.com/sg/products/11942/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
 PRODUCT_NAME = 'Angry Molly × Crocs "Angry Cheese" Co-branded Figurine'
-
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Encoding": "gzip, deflate, br, zstd",
-    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Origin": "https://www.popmart.com",
-    "Referer": "https://www.popmart.com/",
-    "Clientkey": "rmdxjisk7gwykcix",
-    "Country": "SG",
-    "Grey-Secret": "null",
-    "Language": "en",
-    "Priority": "u=1, i",
-    "X-Client-Country": "SG",
-    "X-Client-Namespace": "eurasian",
-    "X-Device-Os-Type": "web",
-    "X-Doughnuts": "",
-    "X-Project-Id": "eude",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-site",
-}
 
 
 def check_stock() -> tuple[bool, str]:
-    ts = int(datetime.now(timezone.utc).timestamp())
-    url = f"{API_URL}&t={ts}"
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    data = resp.json()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36",
+            locale="en-US",
+        )
+        page = context.new_page()
+        page.goto(PRODUCT_PAGE, wait_until="networkidle", timeout=30000)
 
-    skus = data.get("data", {}).get("skus", [])
-    if not skus:
-        return False, "API 回傳無 SKU 資料"
+        # 等待按鈕出現
+        page.wait_for_selector("button", timeout=15000)
 
-    for sku in skus:
-        stock = sku.get("stock", {})
-        online_stock = stock.get("onlineStock", 0)
-        sku_title = sku.get("title", sku.get("id", "?"))
-        print(f"  SKU [{sku_title}] onlineStock = {online_stock}")
-        if online_stock > 0:
-            return True, f"SKU '{sku_title}' 庫存 = {online_stock}"
+        # 找所有按鈕文字
+        buttons = page.locator("button").all_text_contents()
+        print(f"  找到按鈕：{buttons}")
 
-    return False, "所有 SKU onlineStock = 0"
+        for btn in buttons:
+            text = btn.strip().upper()
+            if "ADD TO CART" in text or "BUY NOW" in text:
+                browser.close()
+                return True, f"按鈕文字：'{btn.strip()}'"
+            if "SOLD OUT" in text:
+                browser.close()
+                return False, f"按鈕文字：'{btn.strip()}'"
+
+        browser.close()
+        return False, f"未找到明確按鈕，所有按鈕：{buttons}"
 
 
 def send_email(reason: str):
