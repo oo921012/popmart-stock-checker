@@ -5,28 +5,39 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-PRODUCT_PAGE = "https://www.popmart.com/sg/products/11942/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
+PRODUCT_ID = "11942"
+SKU_ID = "17572"
+API_URL = f"https://www.popmart.com/api/v2/product/productDetails?spuId={PRODUCT_ID}&s={SKU_ID}"
+PRODUCT_PAGE = f"https://www.popmart.com/sg/products/{PRODUCT_ID}/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
 PRODUCT_NAME = 'Angry Molly × Crocs "Angry Cheese" Co-branded Figurine'
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Referer": "https://www.popmart.com/sg/",
+    "Origin": "https://www.popmart.com",
 }
 
 
 def check_stock() -> tuple[bool, str]:
-    resp = requests.get(PRODUCT_PAGE, headers=HEADERS, timeout=15)
+    resp = requests.get(API_URL, headers=HEADERS, timeout=15)
     resp.raise_for_status()
-    html = resp.text
+    data = resp.json()
 
-    if "ADD TO CART" in html:
-        return True, "找到關鍵字：'ADD TO CART'"
-    if "SOLD OUT" in html:
-        return False, "找到售罄關鍵字：'SOLD OUT'"
+    skus = data.get("data", {}).get("skus", [])
+    if not skus:
+        return False, "API 回傳無 SKU 資料"
 
-    print(f"[DEBUG] HTML 片段：{html[:2000]}")
-    return False, "未找到明確庫存狀態"
+    for sku in skus:
+        stock = sku.get("stock", {})
+        online_stock = stock.get("onlineStock", 0)
+        sku_title = sku.get("title", sku.get("id", "?"))
+        print(f"  SKU [{sku_title}] onlineStock = {online_stock}")
+        if online_stock > 0:
+            return True, f"SKU '{sku_title}' 庫存 = {online_stock}"
+
+    return False, f"所有 SKU onlineStock = 0"
 
 
 def send_email(reason: str):
@@ -40,13 +51,13 @@ def send_email(reason: str):
     msg["To"] = recipient
 
     body = f"""
-<h2>🎉 Pop Mart 有貨通知</h2>
+<h2>&#x1F389; Pop Mart 有貨通知</h2>
 <p><strong>商品：</strong>{PRODUCT_NAME}</p>
-<p><strong>狀態：</strong>🟢 有貨！</p>
+<p><strong>狀態：</strong>&#x1F7E2; 有貨！</p>
 <p><strong>偵測依據：</strong>{reason}</p>
 <p><strong>時間：</strong>{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
 <hr>
-<p><a href="{PRODUCT_PAGE}" style="font-size:18px; font-weight:bold;">👉 立即前往購買</a></p>
+<p><a href="{PRODUCT_PAGE}" style="font-size:18px; font-weight:bold;">&#x1F449; 立即前往購買</a></p>
 """
     msg.attach(MIMEText(body, "html"))
 
