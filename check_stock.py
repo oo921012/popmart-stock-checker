@@ -11,14 +11,25 @@ PRODUCT_PAGE = f"https://www.popmart.com/sg/products/{PRODUCT_ID}/Angry-Molly-Cr
 PRODUCT_NAME = 'Angry Molly × Crocs "Angry Cheese" Co-branded Figurine'
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
     "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
     "Origin": "https://www.popmart.com",
-    "Referer": "https://www.popmart.com/sg/",
+    "Referer": "https://www.popmart.com/",
+    "Clientkey": "rmdxjisk7gwykcix",
     "Country": "SG",
-    "Clientkey": "rmdsjsk7gwylcix",
+    "Grey-Secret": "null",
+    "Language": "en",
+    "Priority": "u=1, i",
+    "X-Client-Country": "SG",
+    "X-Client-Namespace": "eurasian",
+    "X-Device-Os-Type": "web",
+    "X-Doughnuts": "",
+    "X-Project-Id": "eude",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
 }
 
 
@@ -83,6 +94,7 @@ def main():
             print("ℹ️  仍售罄，等待下次偵測。")
     except Exception as e:
         print(f"❌ 錯誤：{e}")
+        raise
 
 
 if __name__ == "__main__":
