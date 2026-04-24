@@ -1,8 +1,17 @@
+import subprocess
+import sys
 import smtplib
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+
+# 確保 chromium 已安裝
+subprocess.run(
+    [sys.executable, "-m", "playwright", "install", "chromium"],
+    check=True
+)
+
 from playwright.sync_api import sync_playwright
 
 PRODUCT_PAGE = "https://www.popmart.com/sg/products/11942/Angry-Molly-Crocs-%22Angry-Cheese%22-Co-branded-Figurine"
@@ -18,11 +27,8 @@ def check_stock() -> tuple[bool, str]:
         )
         page = context.new_page()
         page.goto(PRODUCT_PAGE, wait_until="networkidle", timeout=30000)
-
-        # 等待按鈕出現
         page.wait_for_selector("button", timeout=15000)
 
-        # 找所有按鈕文字
         buttons = page.locator("button").all_text_contents()
         print(f"  找到按鈕：{buttons}")
 
@@ -36,7 +42,7 @@ def check_stock() -> tuple[bool, str]:
                 return False, f"按鈕文字：'{btn.strip()}'"
 
         browser.close()
-        return False, f"未找到明確按鈕，所有按鈕：{buttons}"
+        return False, f"未找到明確按鈕：{buttons}"
 
 
 def send_email(reason: str):
